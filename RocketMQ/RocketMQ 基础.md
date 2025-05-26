@@ -1,4 +1,4 @@
-# RocketMQ
+# RocketMQ 基础知识
 
 https://rocketmq.apache.org/
 
@@ -28,11 +28,15 @@ https://rocketmq.apache.org/
 3. RocketMQ：Java 语言实现，**十万级**数据吞吐量，分布式架构，功能强大，扩展性强
 4. Kafka：Scala 语言实现，**十万级**数据吞吐量，处理速度 ms 级，分布式架构，功能较少，应用于大数据较多
 
+## RocketMQ 架构图
+
+（TODO：画图）
+
 ## 环境搭建
 
 略。
 
-## **消息发送**
+## **消息发送（重点）**
 
 ### 主要内容
 
@@ -529,19 +533,19 @@ rocketMQTemplate.syncSend("topic8", msgList, 1000);
 
 #### tag 过滤
 
-##### 消费者
+消费者
 
 ```Java
 @RocketMQMessageListener(topic = "topic9", consumerGroup = "group1", selectorExpression = "tag1")
 ```
 
-##### sql 过滤
+SQL 过滤
 
 ```Java
-@RocketMQMessageListener(topic = "topic9", consumerGroup = "group1", selectorExpression = "age>18" ,selectorType= SelectorType.SQL92)
+@RocketMQMessageListener(topic = "topic9", consumerGroup = "group1", selectorExpression = "age>18", selectorType= SelectorType.SQL92)
 ```
 
-##### 改消息模式
+改消息模式
 
 ```Java
 @RocketMQMessageListener(topic = "topic9", consumerGroup = "group1", messageModel = MessageModel.BROADCASTING)
