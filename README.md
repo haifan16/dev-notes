@@ -5,8 +5,15 @@
 ## 包含内容（持续更新）
 
 - Java
-- Spring / Spring Boot
-- 数据库（MySQL / Redis）
-- 消息队列（RabbitMQ / Kafka / RocketMQ）
+  - JavaSE
+  - Java Virtual Machine
+  - Java Concurrency
+- Database
+  - MySQL
+  - Redis
+  - ~~PostgreSQL~~
+- Message Queue
+  - RocketMQ
+  - ~~Kafka~~
 - 工具配置 / 调试经验
 - 其他零散知识点
