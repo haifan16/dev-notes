@@ -1,19 +1,39 @@
-# web-dev-notes
+# dev-notes
 
-这是一个个人向的 Web 开发学习笔记仓库，用于记录学习过程中的重点内容、不熟悉的知识点以及偶尔的踩坑总结。笔记偏实用性，内容不追求面面俱到，根据实际需求不断补充和调整。
+Just a personal tech note archive while learning to be a better developer. Covers things I’ve studied, got confused about, or messed up and learned from. Always evolving.
 
-## 包含内容（持续更新）
+## 📚 Knowledge Base Structure
 
-- Java
-  - JavaSE
-  - Java Virtual Machine
-  - Java Concurrency
-- Database
-  - MySQL
-  - Redis
-  - ~~PostgreSQL~~
-- Message Queue
+- Operating System
+- Computer Networks
+- Programming Languages
+  - Java
+    - Java SE
+    - Java Virtual Machine
+    - Java Concurrency
+- Frameworks & Middleware
+  - Spring Ecosystem
+    - Spring & Spring Boot
+    - Spring Cloud
+  - RPC Frameworks
+    - Dubbo
+    - ~~gRPC~~
+  - Workflow Engines
+    - Flowable
+    - Activiti
+  - Distributed Systems & Microservices
+- Databases & Storage
+  - Relational Database
+    - MySQL
+    - ~~PostgreSQL~~
+  - NoSQL
+    - Redis
+  - Distributed Storage
+- Message Queues
   - RocketMQ
-  - ~~Kafka~~
-- 工具配置 / 调试经验
-- 其他零散知识点
+  - Kafka
+- DevOps, Tools & Debugging
+- AI & Large Model Applications
+- Miscellaneous
+  - Best Practices & Code Standards
+  - Design Patterns

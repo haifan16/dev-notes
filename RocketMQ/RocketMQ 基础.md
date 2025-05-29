@@ -1,5 +1,3 @@
-# RocketMQ 基础知识
-
 https://rocketmq.apache.org/
 
 ## 为什么使用 MQ？-> MQ 的优势和劣势
