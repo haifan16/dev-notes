@@ -17,7 +17,7 @@ Just a personal tech note archive while learning to be a better developer. Cover
     - Spring Cloud
   - RPC Frameworks
     - Dubbo
-    - ~~gRPC~~
+    - gRPC
   - Workflow Engines
     - Flowable
     - Activiti
@@ -25,7 +25,7 @@ Just a personal tech note archive while learning to be a better developer. Cover
 - Databases & Storage
   - Relational Database
     - MySQL
-    - ~~PostgreSQL~~
+    - PostgreSQL
   - NoSQL
     - Redis
   - Distributed Storage
