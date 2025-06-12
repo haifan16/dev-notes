@@ -44,18 +44,18 @@ Minor GC 会引发 STW，暂停其他用户线程，等垃圾回收结束后用�
 
 ## GC 相关 VM 参数
 
-![alt text](image-6.png)
+![alt text](image.png)
 
 ## GC 分析
 
-### 读取垃圾回收的日志
+1. 读取垃圾回收的日志
 
-![alt text](image-7.png)
+![alt text](image-1.png)
 
 Young Generation 的 From 中的对象不一定是数量达到阈值才会被放入 Old Generation，当 Young Generation 中的内存紧张时，也可能会被放入到 Old Generation
 
-### 大对象直接晋升到 Old Generation
+2. 大对象直接晋升到 Old Generation
 
 整个大到放不下 Young Generation -> 会直接被放入老年代
 
-### Java 中某一个线程内发生了内存溢出异常，并不会导致整个 Java 进程的结束
+3. Java 中某一个线程内发生了内存溢出异常，并不会导致整个 Java 进程的结束
