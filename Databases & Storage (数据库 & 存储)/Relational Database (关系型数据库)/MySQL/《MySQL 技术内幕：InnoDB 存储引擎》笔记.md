@@ -128,7 +128,7 @@ InnoDB 内部有两种 Checkpoint：
 * Sharp Checkpoint（发生在数据库关闭时）
 * Fuzzy Checkpoint
 
-*（TODO：补充 P34~P61 笔记）*
+*（TODO：补充 Page 34~61 笔记）*
 
 # 3 文件
 
@@ -160,4 +160,57 @@ InnoDB 内部有两种 Checkpoint：
 SHOW VARIABLES LIKE 'log_slow_queryies';
 ```
 
-*（TODO：补充 P68~ 笔记）*
+### 3.2.3 查询日志
+
+general_log
+
+### 3.2.4 二进制日志
+
+binary log 记录了对 MySQL 数据库执行更改的所有操作，但是不包括 SELECT 和 SHOW 这类操作，因为这类操作对数据本身并没有修改。
+
+如果用户想记录 SELECT 和 SHOW 操作，那只能使用查询日志。
+
+二进制日志主要有以下几种作用：
+* recovery
+* replication
+* audit(审计)：用户可以通过二进制日志中的信息来进行审计，判断是否有对数据库进行注入的攻击
+
+参数 **max_binlog_size** 指定单个二进制日志文件的最大值，如果超过该值，则产生新的二进制日志文件，后缀名 +1，并记录到 .index 文件。
+
+当使用事务的表存储引擎（如 InnoDB）时，所有 uncommited 的二进制日志会被记录到一个缓存中，等该事务 commited 时直接将缓冲中的二进制日志写入二进制日志文件，而该缓冲的大小由 **binlog_cache_size** 决定（默认 32K）。
+
+默认情况下，二进制日志并不是在每次写的时候同步到磁盘（用户可以理解为缓冲写）。当数据库所在操作系统宕机时，可能会有最后一部分数据没有写入二进制日志文件中，会给恢复和复制带来问题。参数 **sync_binlog**=[N] 表示每写缓冲多少次就同步到磁盘，默认值为 0，如果将 N 设为 1，即 sync_binlog=1 表示采用同步写磁盘的方式来写二进制日志，这时写操作不适用操作系统的缓冲来写二进制日志。
+
+参数 **innodb_support_xa** 设为 1 可以解决...（Page 77 第二段），虽然这个参数和 XA 事务有关，但它同时也能确保二进制日志和 InnoDB 存储引擎数据文件的同步。
+
+参数 **binlog-do-db** 和 **binlog-ignore-db** 表示需要写入或忽略写入哪些库的日志，默认为空，表示需要同步所有库的日志到二进制日志。
+
+参数 **log-slave-update**
+
+参数 **binlog_format** 很重要，它影响了记录二进制日志的格式：（1）STATEMENT；（2）ROW；（3）MIXED。设置为 ROW 对磁盘空间要求比 STATEMENT 大很多。各有优劣。
+
+## 3.3 套接字文件（socket）
+
+```
+show variables like 'socket';
+```
+
+## 3.4 pid 文件
+
+```
+show variables like 'pid_file';
+```
+
+## 3.5 表结构定义文件
+
+以 frm 为后缀名的文件，记录了该表的表结构定义。
+
+frm 还用来存放视图的定义，如：用户创建了一个 v_a 视图（TODO：了解是什么），那么对应地会产生一个 v_a.frm 文件，用来记录视图的定义，是文本，可以直接 cat 查看。
+
+## 3.6 InnoDB 存储引擎文件
+
+### 3.6.1 表空间文件（tablespace file）
+
+### 3.6.2 重做日志文件
+
+*（TODO：补充 Page 86~ 笔记）*
