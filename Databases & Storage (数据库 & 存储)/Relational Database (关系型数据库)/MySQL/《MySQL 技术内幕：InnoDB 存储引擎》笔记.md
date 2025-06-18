@@ -187,7 +187,7 @@ binary log 记录了对 MySQL 数据库执行更改的所有操作，但是不�
 
 参数 **log-slave-update**
 
-参数 **binlog_format** 很重要，它影响了记录二进制日志的格式：（1）STATEMENT；（2）ROW；（3）MIXED。设置为 ROW 对磁盘空间要求比 STATEMENT 大很多。各有优劣。
+参数 **binlog_format** 很重要，它影响了记录二进制日志的格式：（1）STATEMENT；（2）ROW；（3）MIXED。设置为 ROW 对磁盘空间要求比 STATEMENT 大很多。这项设置可以更好地保证主从数据库之间的数据一致性。
 
 ## 3.3 套接字文件（socket）
 
@@ -211,6 +211,160 @@ frm 还用来存放视图的定义，如：用户创建了一个 v_a 视图（TO
 
 ### 3.6.1 表空间文件（tablespace file）
 
-### 3.6.2 重做日志文件
+默认配置下会有一个初始大小为 10MB，名为 ibdata1 的文件。它就是默认的 tablespace file。
 
-*（TODO：补充 Page 86~ 笔记）*
+* 参数 innodb_data_file_path
+* 参数 innodb_file_per_table：如果设置了这个参数，用户可以将每个基于 InnoDB 的表产生一个独立表空间。其命名规则为：表名.ibd
+
+### 3.6.2 重做日志文件（redo log file）
+
+* innodb_log_file_size
+* innodb_log_files_in_group
+* innodb_mirrored_log_groups
+* innodb_log_group_home_dir
+
+重做日志文件的大小对 InnoDB 的性能有非常大的影响：
+一方面，不能设置得太大 -> 恢复时可能需要很长时间；
+另一方面，不能设置得太小
+    -> (1) 可能导致一个事务的日志需要多次切换重做日志文件
+    -> (2) 会导致频繁地发生 async checkpoint -> 导致性能的抖动
+        具体描述：因为重做日志有一个 capacity 变量，该值代表了最后的检查点不能超过这个阈值，如果超过则必须将 innodb buffer pool 中 flush list 中的部分脏数据写回磁盘，这时会导致用户线程的阻塞。
+
+Q：既然同样是记录事务日志，redo log 和之前介绍的 binlog 有什么区别？
+A：
+1. **binlog 会记录所有与 MySQL 数据库有关的日志记录**，包括 InnoDB、MyISAM 等其他存储引擎的日志；而 InnoDB 的 redo log 只记录有关该存储引擎本身的事务日志。
+2. **记录的内容不同**，无论将 binlog 文件的记录格式设为 STATEMENT、ROW、MIXED，其记录的都是关于一个事务的具体操作内容，即该日志是逻辑日志；而 InnoDB 的 redo log 记录的是关于每个页的更改的物理情况。
+3. **写入的时间不同**，binlog 文件仅在事务提交前进行提交，即只写磁盘一次，不论这时该事务多大；而在事务进行的过程中，却不断有 redo entry(重做日志条目) 被写入到 redo log 文件中。
+
+Q：重做日志条目的结构
+A：
+* redo_log_type 占用 1 byte
+* space 表示表空间的 ID，但采用压缩的方式，因此占用的空间可能小于 4 bytes
+* page_no 表示页的偏移量，同样采用压缩的方式
+* redo_log_body 表示每个 redo log 的数据部分，恢复时需要调用相应的函数进行解析
+
+![alt text](image-1.png)
+
+从 redo log buffer 往磁盘写入时，是按 512 个 bytes，也就是一个扇区的大小进行写入。因为扇区是写入的最小单位 -> 因此可以保证写入一定是成功的 -> 因此在 redo log 的写入过程中不需要有 doublewrite。*（暂时不太理解）*
+
+* innodb_flush_log_at_trx_commit：有效值有 0、1、2。
+    0：当提交事务时，不将事务的 redo log 写入磁盘上的日志文件，而是等待主线程（master thread）每秒的刷新
+    1：在执行 commit 时将 redo log buffer 同步写到磁盘，即伴有 fsync 的调用
+    2：将 redo log 异步写到磁盘，即写到文件系统的缓存中 -> 因此不能完全保证在执行 commit 时肯定会写入 redo log 文件，只是有这个动作发生
+
+    因此，为了保证 ACID 中的 D(Durability)，必须将 innodb_flush_log_at_trx_commit 设为 1，即每当有事务提交时，就必须确保事务都已经写入 redo log 文件 -> 这样当数据库宕机时可以通过 redo log 文件恢复，并保证可以恢复已经提交的事务。
+
+    而设置为 0 或 2 都有可能发生恢复时部分事务的丢失。不同之处在于设置为 2 时，当 MySQL 数据库宕机而操作系统和服务器并没有宕机时，由于此时未写入磁盘的事务日志保存在文件系统缓存中，当恢复时同样能保证数据不丢失。
+
+# 4 表
+
+## 4.1 索引组织表（index organized table）
+
+在 InnoDB 中，表都是根据主键顺序组织存放的，这种存储方式称为 index organized table。在 InnoDB 中，每张表都有一个主键（Primary Key）。
+
+如果在创建表时没有显式地定义主键，InnoDB 会按如下方式选择/创建主键：
+* 首先判断表中是否有非空的唯一索引（Unique NOT NULL）：如果有 -> 该列为主键
+* 如果不符合上述条件，InnoDB 自动创建一个 6 bytes 大小的指针
+
+当表中有多个非空唯一索引时，InnoDB 将选择**建表时第一个定义的**非空唯一索引为主键。注意：是根据定义索引的顺序，而不是建表时列的顺序。
+
+## 4.2 InnoDB 逻辑存储结构
+
+在 InnoDB 中，所有数据都被逻辑地存放在一个空间中，称之为 tablespace(表空间)。表空间又由 segment(段)、extent(区)、page(页) 组成。page 在一些文档中有时也称为 block(块)。
+
+![alt text](image-2.png)
+
+### 4.2.1 tablespace
+
+InnoDB 逻辑结构的最高层
+
+注意：如果启用了 innodb_file_per_file 参数，每张表的表空间内存放的只是数据、索引、插入缓冲 Bitmap 页，而其他类的数据，如回滚（undo）信息，插入缓冲索引页、系统事务信息，二次写缓冲（Double write buffer）等还是存放在原来的共享表空间内。
+-> 这也同时说明了另一个问题：即使在启用了参数 innodb_file_per_file 之后，共享表空间还是会不断地增加大小。
+
+### 4.2.2 segment
+
+表空间由各个段组成，常见的段有数据段、索引段、回滚段等。数据段就是 B+ 树的叶子节点（Leaf node segment），索引段就是 B+ 树的非叶子节点（Non-Leaf node segment）。回滚段比较特殊，在后面章节单独介绍。
+
+### 4.2.3 extent
+
+区是连续页组成的空间，**在任何情况下每个区的大小都为 1MB**。为了保证区的连续性，InnoDB 一次从磁盘申请 4~5 个区。**默认情况下 InnoDB 页的大小为 16KB，即一个区中一共有 64 个连续的页。**
+
+### 4.2.4 page
+
+页是 InnoDB 磁盘管理的最小单位，默认每个页的大小为 16KB，可以通过参数 innodb_page_size 设置为 4K、8K、16K。
+
+InnoDB 中常见的页类型有：
+* B-tree Node (数据页)
+* undo Log Page (undo 页)
+* System Page (系统页)
+* Transaction system Page (事务数据页)
+* Insert Buffer Bitmap (插入缓冲位图页)
+* Insert Buffer Free List (插入缓冲空闲列表页)
+* Uncompressed BLOB Page (未压缩的二进制大对象页)
+* compressed BLOB Page (压缩的二进制大对象页)
+
+### 4.2.5 row
+
+每个页最多允许存放 7992 行记录
+
+## 4.3 InnoDB 行记录格式
+
+*（TODO：补充 Page 102~182 笔记）*
+
+# 5 索引与算法
+
+## 5.1 InnoDB 存储引擎索引概述
+
+InnoDB 支持以下几种常见的索引：
+* B+ 树索引
+* 全文索引
+* 哈希索引
+
+InnoDB 支持的哈希索引是自适应的，InnoDB 会根据表的使用情况自动为表生成哈希索引，不能人为干预是否在一张表中生成哈希索引。
+
+B+ 树就是传统意义上的索引。
+注意：B+ 树中的 B 不是代表 binary，而是代表 balance，因为 B+ 树是从最早的平衡二叉树演化而来，但是，B+ 树不是一个二叉树。
+
+B+ 树索引并不能找到一个给定键值的具体行，它能找到的只是被查找数据所在的页。然后数据库通过把页读入到内存，再在内存中进行查找，最后找到要查找的数据。
+
+## 5.2 数据结构与算法
+
+### 5.2.1 二分查找法
+
+### 5.2.2 二叉查找树与平衡二叉树（AVL 树）
+
+演化：二叉查找树 -> 平衡二叉树 -> B 树 -> B+ 树
+
+## 5.3 B+ 树（Page 187~
+
+B+ 树是为磁盘或其他直接存取设备设计的一种平衡查找树。在 B+ 树中，所有记录节点都是按键值的大小顺序存放在同一层的叶子节点上，由各叶子节点指针进行连接。
+
+### 5.3.1 B+ 树的插入操作
+
+* B+ 树插入的三种情况：
+| Leaf Page 满 | Index Page 满 | 操作                                                         |
+| ------------ | ------------- | ------------------------------------------------------------ |
+| No           | No            | 直接将记录插入到叶子节点                                     |
+| Yes          | No            | 1. 拆分 Leaf Page；2. 将中间的节点放入到 Index Page 中；3. 小于中间节点的记录放左边；4. 大于或等于中间节点的记录放右边 |
+| Yes          | Yes           | 1. 拆分 Leaf Page；2. 小于中间节点的记录放左边；3. 大于或等于中间节点的记录放右边；4. 拆分 Index Page；5. 小于中间节点的记录放左边；6. 大于中间节点的记录放右边；7. 中间节点放入上一层 Index Page |
+
+* B+ 树提供了类似于 AVL 树的旋转（Rotation）功能 -> 减少页的拆分（split）操作
+    拆分发生在 Leaf Page 已经满，但是其左右兄弟节点没有满的情况下。
+    *（疑问：所以到底是按图 5-8，根据第二种情况去拆分叶子节点，还是按图 5-10，做旋转操作呢？这里讲得不够严谨。）*
+
+B+ 树模拟：https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html
+
+### 5.3.2 B+ 树的删除操作
+
+B+ 树使用 **fill factor (填充因子) 来控制树的删除变化**，50% 是 fill factor 可设的最小值。
+
+* B+ 树删除操作的三种情况：
+
+| 叶子节点小于 fill factor | 中间节点小于 fill factor | 操作                                                         |
+| ------------------------ | ------------------------ | ------------------------------------------------------------ |
+| No                       | No                       | 直接将记录从叶子节点删除，如果该节点还是 Index Page 的节点，用该节点的右节点代替 |
+| Yes                      | No                       | 合并叶子节点和它的兄弟节点，同时更新 Index Page              |
+| Yes                      | Yes                      | 1. 合并叶子节点和它的兄弟节点；2. 更新 Index Page；3. 合并 Index Page 和它的兄弟节点 |
+*（暂时不太理解）*
+
+*（TODO：补充 Page 183~ 笔记）*
