@@ -579,4 +579,23 @@ wait-for graph 要求数据库保存以下两种信息：
 
 # 7 事务
 
-*（TODO：补充 Page 285~ 笔记）*
+## 7.1 认识事务
+
+### 7.1.1 概述
+
+* A（Atomicity），原子性
+* C（Consistency），一致性
+* I（Isolation），隔离性，并发控制（concurrency control），可串行化（serializability），锁（locking）
+* D（Durability），持久性
+
+### 7.1.2 分类
+
+1. 从事务理论的角度
+
+* Flat Transactions (扁平事务)
+* Flat Transactions with Savepoints (带有保存点的扁平事务)
+* Chained Transactions (链事务)：在提交一个事务时，释放不需要的数据对象，将必要的处理上下文隐式地传给下一个要开始的事务。
+* Nested Transactions (嵌套事务)
+* Distributed Transactions (分布式事务)
+
+*（TODO：补充 Page 293~ 笔记）*
