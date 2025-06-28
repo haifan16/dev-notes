@@ -249,8 +249,10 @@ A：
 
 * innodb_flush_log_at_trx_commit：有效值有 0、1、2。
     0：当提交事务时，不将事务的 redo log 写入磁盘上的日志文件，而是等待主线程（master thread）每秒的刷新
-    1：在执行 commit 时将 redo log buffer 同步写到磁盘，即伴有 fsync 的调用
-    2：将 redo log 异步写到磁盘，即写到文件系统的缓存中 -> 因此不能完全保证在执行 commit 时肯定会写入 redo log 文件，只是有这个动作发生
+    1：在执行 commit 时将 redo log buffer **同步**写到磁盘，即**伴有 fsync 的调用**
+    2：将 redo log **异步**写到磁盘，即**写到文件系统的缓存中** -> 因此不能完全保证在执行 commit 时肯定会写入 redo log 文件，只是有这个动作发生
+        当 MySQL 数据库发生宕机而操作系统不发生宕机时 -> 不会导致事务的丢失
+        当操作系统宕机时，重启数据库后会丢失从文件系统缓存刷新到重做日志文件那部分事务
 
     因此，为了保证 ACID 中的 D(Durability)，必须将 innodb_flush_log_at_trx_commit 设为 1，即每当有事务提交时，就必须确保事务都已经写入 redo log 文件 -> 这样当数据库宕机时可以通过 redo log 文件恢复，并保证可以恢复已经提交的事务。
 
@@ -598,4 +600,14 @@ wait-for graph 要求数据库保存以下两种信息：
 * Nested Transactions (嵌套事务)
 * Distributed Transactions (分布式事务)
 
-*（TODO：补充 Page 293~ 笔记）*
+## 7.2 事务的实现
+
+### 7.2.1 redo
+
+1. 基本概念
+
+redo log 用来实现 ACID 中的 D。其由两部分组成：
+* 内存中的 redo log buffer，是易失的
+* redo log file，是永久的
+
+*（TODO：补充 Page 296~ 笔记）*
