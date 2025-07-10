@@ -766,3 +766,67 @@ JVM 指令集所支持的数据类型：
 
 ### 7.3.5 初始化
 
+## 7.4 类加载器
+
+Class Loader
+
+### 7.4.1 类与类加载器
+
+### 7.4.2 双亲委派模型
+
+从 JVM 的角度来看，只存在两种不同的类加载器：
+1. 启动类加载器（Bootstrap ClassLoader），C++ 实现，是虚拟机自身的一部分；
+2. 其他所有的类加载器，Java 实现，独立存在于虚拟机外部，且全都继承自抽象类 java.lang.ClassLoader
+
+从开发人员的角度分得更细致一些，三层类加载器、双亲委派的类加载架构。
+
+**三个系统提供的类加载器**：
+1. 启动类加载器（Bootstrap Class Loader）：负责加载 <JAVA_HOME>\lib 目录，或被 -Xbootclasspath 参数所指定的路径中存放的，且是 JVM 能够识别的（文件名符合的）类加载到虚拟机的内存中。
+2. 扩展类加载器（Extension Class Loader）：负责加载 <JAVA_HOME>\lib\ext 目录，或被 java.ext.dirs 系统变量所指定的路径中所有的类库。
+3. 应用程序类加载器（Application Class Loader）：也称“系统类加载器”，负责加载用户类路径（ClassPath）上所有的类库。如果应用程序中没有自定义过自己的类加载器，一般情况下这个就是程序中默认的类加载器。
+
+**类加载器双亲委派模型（Parents Delegation Model）**：
+![alt text](image-30.png)
+
+类加载器之间的父子关系一般不是以继承（Inheritance）的关系来实现的，而是“通常”使用组合（Composition）关系来复用父加载器的代码。
+
+```
+protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+    // 首先，检查请求的类是否已经被加载过了
+    Class c = findLoadedClass(name);
+    if (c == null) {
+        try {
+            if (parent != null) {
+                c = parent.loadClass(name, false);
+            } else {
+                c = findBootstrapClassOrNull(name);
+            }
+        } catch (ClassNotFoundException e) {
+            // 如果父类加载器抛出ClassNotFoundException
+            // 说明父类加载器无法完成加载请求
+        }
+        if (c == null) {
+            // 在父类加载器无法加载时
+            // 再调用本身的findClass方法来进行类加载
+            c = findClass(name);
+        }
+    }
+    if (resolve) {
+        resolveClass(c);
+    }
+}
+```
+
+工作过程：如果一个类加载器收到了类加载的请求，它首先不会自己去尝试加载这个类，而是把这个请求委派给父类加载器去完成，每一个层次的类加载器都是如此，因此所有的加载请求最终都应该传送到最顶层的启动类加载器中，只有当父加载器反馈自己无法完成这个加载请求（它的搜索范围中没有找到所需的类）时，子加载器才会尝试自己去完成加载。
+
+这段代码的逻辑：
+先检查请求加载的类型是否已经被加载过：
+    若没有 -> 则调用父加载器的 loadClass()；
+        若父加载器为空 -> 则默认使用启动类加载器作为父加载器。
+    假如父类加载器加载失败，抛出 ClassNotFoundException -> 才调用自己的 findClass() 尝试进行加载。
+
+### 7.4.3 破坏双亲委派模型
+
+## 7.5 Java模块化系统
+
+*（TODO：补充笔记）*
